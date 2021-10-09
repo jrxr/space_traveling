@@ -1,6 +1,6 @@
 .headerContainer {
   height: 5rem;
-  border-bottom: 1px solid var(--heading);
+  border-bottom: 1px solid var(--pink);
 }
 
 .headerContent {
@@ -26,11 +26,11 @@
     }
 
     &:hover {
-      color: var(--heading);
+      color: var(--pink);
     }
 
     &:active {
-      color: var(--heading);
+      color: var(--pink);
       font-weight: bold;
     }
   }

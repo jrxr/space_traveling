@@ -31,109 +31,116 @@ interface PostPagination {
 }
 
 interface HomeProps {
+  preview: boolean;
   postsPagination: PostPagination;
 }
 
-export default function Home({ postsPagination }: HomeProps) {
-  const [data, setData] = useState<PostPagination>(postsPagination);
+export default function Home({ preview, postsPagination }: HomeProps) {
+  const [posts, setPosts] = useState<PostPagination>({
+    ...postsPagination,
+    results: postsPagination.results.map(post => ({
+      ...post,
+      first_publication_date: format(
+        new Date(post.first_publication_date),
+        'dd MMM yyyy',
+        {
+          locale: ptBR,
+        }
+      ),
+    })),
+  });
 
-  function handleNextPage() {
-    fetch(data.next_page)
-      .then(response => response.json())
-      .then(responseData =>
-        setData({
-          next_page: responseData.next_page,
-          results: [
-            ...data.results,
-            ...responseData?.results.map(post => {
-              return {
-                uid: post.uid,
-                data: {
-                  title: post.data.title,
-                  subtitle: post.data.subtitle,
-                  author: post.data.author,
-                },
-                publication_date: post.first_publication_date,
-              };
-            }),
-          ],
-        })
-      )
-      .catch(err => console.error(err));
+  async function loadPosts(): Promise<void> {
+    const response = await fetch(`${posts.next_page}`).then(data =>
+      data.json()
+    );
+
+    const postsResults = response.results.map(post => ({
+      ...post,
+      first_publication_date: format(
+        new Date(post.first_publication_date),
+        'dd MMM yyyy',
+        {
+          locale: ptBR,
+        }
+      ),
+    }));
+
+    const newPosts = {
+      ...posts,
+      next_page: response.next_page,
+      results: [...posts.results, ...postsResults],
+    };
+
+    setPosts(newPosts);
   }
 
   return (
     <>
       <Header />
-      <main className={commonStyles.contentContainer}>
-        <ul>
-          {data.results.map(post => {
-            <li key={post.uid} className={styles.post}>
+      <main className={styles.contentContainer}>
+        <section>
+          {posts.results.map(post => (
+            <article className={styles.postContent} key={post.uid}>
               <Link href={`/post/${post.uid}`}>
                 <a>
                   <h1>{post.data.title}</h1>
-                  <h2>{post.data.subtitle}</h2>
-                  <footer>
-                    <span>
+                  <p>{post.data.subtitle}</p>
+                  <div>
+                    <time>
                       <FiCalendar />
-                      {format(
-                        new Date(post.first_publication_date),
-                        'dd MMM yyyy',
-                        { locale: ptBR }
-                      )}
-                    </span>
+                      {post.first_publication_date}
+                    </time>
                     <span>
                       <FiUser />
                       {post.data.author}
                     </span>
-                  </footer>
+                  </div>
                 </a>
               </Link>
-            </li>;
-          })}
-        </ul>
-        {data.next_page && (
-          <button onClick={handleNextPage} type="button">
-            Carregar mais posts
-          </button>
-        )}
+            </article>
+          ))}
+          {posts.next_page && (
+            <button type="button" onClick={loadPosts}>
+              Carregar mais posts
+            </button>
+          )}
+          {preview && (
+            <aside className={commonStyles.exitPreviewButton}>
+              <Link href="/api/exit-preview">
+                <a>Sair do modo Preview</a>
+              </Link>
+            </aside>
+          )}
+        </section>
       </main>
     </>
   );
 }
 
-export const getStaticProps = async () => {
+export const getStaticProps: GetStaticProps = async ({
+  preview = false,
+  previewData,
+}) => {
   const prismic = getPrismicClient();
   const postsResponse = await prismic.query(
     [Prismic.Predicates.at('document.type', 'posts')],
     {
-      fetch: ['posts.title', 'posts.subtitle', 'posts.author'],
+      ref: previewData?.ref ?? null,
       pageSize: 1,
     }
   );
 
-  let posts: Post[] = [];
-
-  if (postsResponse?.results) {
-    posts = postsResponse.results.map(post => {
-      return {
-        uid: post.uid,
-        data: {
-          title: post.data.title,
-          subtitle: post.data.subtitle,
-          author: post.data.author,
-        },
-        first_publication_date: post.first_publication_date,
-      };
-    });
+  const postsPagination = {
+    next_page: postsResponse.next_page,
+    results: postsResponse.results,
   }
 
   return {
     props: {
-      postsPagination: {
-        next_page: postsResponse?.next_page ?? null,
-        results: posts,
-      },
+      postsPagination,
+      preview,
     },
+    revalidate: 60 * 60 * 24 // 24 hours
   };
 };
