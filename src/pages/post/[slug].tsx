@@ -10,7 +10,7 @@ import { RichText } from 'prismic-dom';
 import Prismic from '@prismicio/client';
 
 import Header from '../../components/Header';
-// import UtterancesComments from '../../components/UtterancesComments';
+import Comments from '../../components/Comments';
 
 import { getPrismicClient } from '../../services/prismic';
 
@@ -43,7 +43,12 @@ interface PostProps {
   prevPost: Post | null;
 }
 
-export default function Post({ preview, post, nextPost, prevPost }: PostProps) {
+export default function Post({
+  preview,
+  post,
+  nextPost,
+  prevPost,
+}: PostProps): JSX.Element {
   const router = useRouter();
 
   const readTime = useMemo(() => {
@@ -51,15 +56,15 @@ export default function Post({ preview, post, nextPost, prevPost }: PostProps) {
       return 0;
     }
 
-    let completeText = '';
-    const readWordsMinute = 100;
+    let fullText = '';
+    const readWordsPerMinute = 200;
 
     post.data.content.forEach(postContent => {
-      completeText += postContent.heading;
-      completeText += RichText.asText(postContent.body);
+      fullText += postContent.heading;
+      fullText += RichText.asText(postContent.body);
     });
 
-    const time = Math.ceil(completeText.split(/\s/g).length / readWordsMinute);
+    const time = Math.ceil(fullText.split(/\s/g).length / readWordsPerMinute);
 
     return time;
   }, [post, router.isFallback]);
@@ -169,7 +174,7 @@ export default function Post({ preview, post, nextPost, prevPost }: PostProps) {
               )}
             </div>
           </footer>
-          {/* <UtterancesComments /> */}
+          <Comments />
           {preview && (
             <aside className={commonStyles.exitPreviewButton}>
               <Link href="/api/exit-preview">
@@ -186,20 +191,20 @@ export default function Post({ preview, post, nextPost, prevPost }: PostProps) {
 export const getStaticPaths: GetStaticPaths = async () => {
   const prismic = getPrismicClient();
   const posts = await prismic.query(
-    [Prismic.predicates.at('document.type', 'post')],
+    [Prismic.predicates.at('document.type', 'posts')],
     {
-      pageSize: 1,
+      pageSize: 2, // posts per page
     }
   );
 
   const paths = posts.results.map(post => ({
     params: { slug: post.uid },
-  }))
+  }));
 
   return {
     paths,
     fallback: true,
-  }
+  };
 };
 
 export const getStaticProps: GetStaticProps = async ({
@@ -238,6 +243,6 @@ export const getStaticProps: GetStaticProps = async ({
       prevPost: prevPost.results[0] ?? null,
       post: response,
     },
-    revalidate: 60 * 60 * 5, // 24 hours
+    revalidate: 60 * 5, // 5 minutes
   };
 };
